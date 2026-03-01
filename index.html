@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ImpulseIQ</title>
+</head>
+<body>
+    <h2>ImpulseIQ – Behavioural Risk Engine</h2>
+
+    <form method="POST">
+        Transaction Amount: <input type="number" name="transaction_amount" required><br><br>
+        Monthly Salary: <input type="number" name="monthly_salary" required><br><br>
+        Balance After: <input type="number" name="balance_after" required><br><br>
+        Recent Impulse Txns: <input type="number" name="recent_impulse" required><br><br>
+        Total Txns (Last 7): <input type="number" name="total_txn" required><br><br>
+        Weekend: <input type="checkbox" name="is_weekend" value="1"><br><br>
+
+        <button type="submit">Analyse</button>
+    </form>
+
+    {% if prediction %}
+        <h3>Results:</h3>
+        <p>Impulse Probability: {{ prediction.prob }}</p>
+        <p>Risk Score: {{ prediction.risk_score }}</p>
+        <p>Risk Tier: {{ prediction.tier }}</p>
+    {% endif %}
+
+</body>
+</html>
