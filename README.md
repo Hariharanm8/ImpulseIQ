@@ -115,11 +115,11 @@ XGBoost was selected as the final model because:
 
 | Metric | XGBoost |
 |--------|---------|
-| Accuracy | XX% |
-| Precision | XX% |
-| Recall | XX% |
-| F1 Score | XX |
-| ROC-AUC | XX |
+| Accuracy | 98% |
+| Precision | 91.27% |
+| Recall | 87.42% |
+| F1 Score | 0.8930 |
+| ROC-AUC | 0.9895 |
 
 The model was optimized to maintain strong recall to prevent under-detection of high-risk impulsive behaviour.
 
