@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ImpulseIQ — Behavioural Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #05050f; --surface:  #0d0d1f; --surface2: #13132a;
+    --border:   #1e1e40; --accent1:  #f72585; --accent2:  #4cc9f0;
+    --accent3:  #7bed9f; --accent4:  #ffdd57; --accent5:  #a29bfe;
+    --text:     #e8e8f0; --muted:    #7070a0;
+    --critical: #f72585; --high:     #ff9f43; --moderate: #ffdd57; --low: #4cc9f0;
+    --font-display: 'Syne', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font-mono); min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size:40px 40px; opacity:0.4; pointer-events:none; z-index:0;
+  }
+  .everything { position:relative; z-index:1; }
+  header {
+    padding:32px 40px 24px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg, rgba(247,37,133,0.06) 0%, transparent 100%);
+  }
+  .logo { font-family:var(--font-display); font-size:28px; font-weight:800; letter-spacing:-1px; }
+  .logo span { color:var(--accent1); }
+  .header-right { display:flex; align-items:center; gap:20px; font-size:11px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--accent3); animation:pulse 2s infinite; display:inline-block; margin-right:6px; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(123,237,159,0.4);} 50%{opacity:0.6;box-shadow:0 0 0 6px rgba(123,237,159,0);} }
+  .dashboard { padding:28px 40px; display:flex; flex-direction:column; gap:24px; }
+  .section-label { font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:var(--accent1); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+  .kpi-row { display:grid; grid-template-columns:repeat(7,1fr); gap:14px; }
+  .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 16px; position:relative; overflow:hidden; transition:border-color 0.2s; }
+  .kpi-card:hover { border-color:var(--accent1); }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--kpi-color,var(--accent1)); }
+  .kpi-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .kpi-value { font-family:var(--font-display); font-size:26px; font-weight:800; color:var(--kpi-color,var(--text)); line-height:1; }
+  .kpi-sub { font-size:10px; color:var(--muted); margin-top:5px; }
+  .grid-2  { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .grid-3  { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; }
+  .card-title { font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--text); margin-bottom:18px; letter-spacing:0.3px; }
+  .model-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .model-table th { text-align:left; padding:8px 12px; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); }
+  .model-table td { padding:10px 12px; border-bottom:1px solid rgba(30,30,64,0.5); font-family:var(--font-mono); font-size:12px; }
+  .model-table tr:last-child td { border-bottom:none; }
+  .model-table tr:hover td { background:var(--surface2); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:0.5px; }
+  .badge-best { background:rgba(123,237,159,0.15); color:var(--accent3); border:1px solid rgba(123,237,159,0.3); }
+  .tier-pill { display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:0.5px; }
+  .tier-Critical      { background:rgba(247,37,133,0.15); color:#f72585; border:1px solid rgba(247,37,133,0.3); }
+  .tier-High          { background:rgba(255,159,67,0.15);  color:#ff9f43; border:1px solid rgba(255,159,67,0.3); }
+  .tier-Moderate      { background:rgba(255,221,87,0.15);  color:#ffdd57; border:1px solid rgba(255,221,87,0.3); }
+  .tier-Low           { background:rgba(76,201,240,0.15);  color:#4cc9f0; border:1px solid rgba(76,201,240,0.3); }
+  .tier-Warning       { background:rgba(255,159,67,0.15);  color:#ff9f43; border:1px solid rgba(255,159,67,0.3); }
+  .tier-Watch         { background:rgba(255,221,87,0.15);  color:#ffdd57; border:1px solid rgba(255,221,87,0.3); }
+  .tier-Safe          { background:rgba(76,201,240,0.15);  color:#4cc9f0; border:1px solid rgba(76,201,240,0.3); }
+  .tier-Immediate-Alert { background:rgba(247,37,133,0.15); color:#f72585; border:1px solid rgba(247,37,133,0.3); }
+  .nudge-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .nudge-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; overflow:hidden; transition:transform 0.2s, border-color 0.2s; }
+  .nudge-card:hover { transform:translateY(-3px); border-color:var(--nc,var(--accent1)); }
+  .nudge-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--nc,var(--accent1)); }
+  .nudge-alert { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--nc,var(--accent1)); margin-bottom:6px; }
+  .nudge-title { font-family:var(--font-display); font-size:12px; font-weight:700; color:var(--text); margin-bottom:8px; line-height:1.3; }
+  .nudge-user  { font-size:9px; color:var(--muted); margin-bottom:8px; font-family:var(--font-mono); }
+  .nudge-meta  { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .nudge-tip   { font-size:10px; color:var(--accent4); line-height:1.4; border-left:2px solid var(--accent4); padding-left:8px; margin-top:10px; font-style:italic; }
+  .nudge-savings { font-size:11px; color:var(--accent3); font-weight:600; margin-top:8px; }
+  .shap-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .shap-label { font-size:10px; color:var(--muted); width:200px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shap-bar-bg { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+  .shap-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--accent1),var(--accent5)); transition:width 1s ease; }
+  .shap-val { font-size:10px; color:var(--text); width:50px; text-align:right; flex-shrink:0; }
+  .tier-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-radius:8px; margin-bottom:8px; background:var(--surface2); border:1px solid var(--border); }
+  .tier-row-label { font-family:var(--font-display); font-size:13px; font-weight:700; }
+  .tier-row-stat { font-size:11px; color:var(--muted); text-align:right; }
+  .tier-row-stat strong { color:var(--text); display:block; font-size:15px; }
+  .pipeline-trail { display:flex; align-items:center; gap:0; overflow-x:auto; padding-bottom:4px; }
+  .pipeline-step { display:flex; align-items:center; gap:0; flex-shrink:0; }
+  .pipeline-node { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:10px; letter-spacing:0.5px; color:var(--muted); white-space:nowrap; transition:all 0.2s; cursor:default; }
+  .pipeline-node:hover { background:rgba(247,37,133,0.1); border-color:var(--accent1); color:var(--text); }
+  .pipeline-node.active { background:rgba(247,37,133,0.12); border-color:var(--accent1); color:var(--accent1); font-weight:600; }
+  .pipeline-arrow { color:var(--border); font-size:16px; padding:0 4px; }
+  footer { margin-top:10px; padding:20px 40px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted); letter-spacing:1px; }
+  canvas { max-width:100%; }
+</style>
+</head>
+<body>
+<div class="everything">
+<header>
+  <div>
+    <div class="logo">Impulse<span>IQ</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;">BEHAVIOURAL FINANCIAL ANALYTICS PLATFORM</div>
+  </div>
+  <div class="header-right">
+    <div><span class="live-dot"></span>LIVE DEMO</div>
+    <div>HACKATHON BUILD</div>
+    <div style="color:var(--accent3);">PIPELINE COMPLETE</div>
+  </div>
+</header>
+<div class="dashboard">
+
+  <div>
+    <div class="section-label">Pipeline Overview</div>
+    <div class="pipeline-trail"><div class="pipeline-step"><div class="pipeline-node">S1 Feature Eng</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S2 EBA</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S3 Logistic Reg</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S4 RF+XGBoost</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S5 Deep Eval</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S6 SHAP</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S7 Risk Score</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S8 Clustering</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S9 Next-Txn</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node">S10 Nudges</div><div class="pipeline-arrow">&#8250;</div></div><div class="pipeline-step"><div class="pipeline-node active">S11 Dashboard</div></div></div>
+  </div>
+
+  <div>
+    <div class="section-label">Key Metrics</div>
+    <div class="kpi-row"><div class="kpi-card" style="--kpi-color:var(--accent2);"><div class="kpi-label">Transactions</div><div class="kpi-value">23,852</div><div class="kpi-sub">Scored &amp; Analysed</div></div><div class="kpi-card" style="--kpi-color:var(--accent5);"><div class="kpi-label">Users Profiled</div><div class="kpi-value">400</div><div class="kpi-sub">With Risk Scores</div></div><div class="kpi-card" style="--kpi-color:var(--accent3);"><div class="kpi-label">Best ROC-AUC</div><div class="kpi-value">0.9895</div><div class="kpi-sub">XGBoost Model</div></div><div class="kpi-card" style="--kpi-color:var(--accent3);"><div class="kpi-label">Best F1 Score</div><div class="kpi-value">0.8930</div><div class="kpi-sub">Threshold Tuned</div></div><div class="kpi-card" style="--kpi-color:var(--accent4);"><div class="kpi-label">Best MCC</div><div class="kpi-value">0.8635</div><div class="kpi-sub">Imbalance-Robust</div></div><div class="kpi-card" style="--kpi-color:var(--critical);"><div class="kpi-label">Critical Users</div><div class="kpi-value">50</div><div class="kpi-sub">Risk Score &gt; 75</div></div><div class="kpi-card" style="--kpi-color:var(--high);"><div class="kpi-label">Active Alerts</div><div class="kpi-value">8</div><div class="kpi-sub">Warning + Immediate</div></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card"><div class="card-title">User Risk Tier Distribution</div><canvas id="donutChart" height="200"></canvas></div>
+    <div class="card"><div class="card-title">Model Performance Comparison</div><canvas id="modelChart" height="200"></canvas></div>
+    <div class="card"><div class="card-title">Risk Score Distribution</div><canvas id="scoreDistChart" height="200"></canvas></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Risk Tier Behavioural Breakdown</div>
+      <div class="tier-row"><div><div class="tier-row-label" style="color:#ffdd57;">Moderate</div><div style="font-size:10px;color:var(--muted);">50 users</div></div><div class="tier-row-stat"><strong>39.5%</strong>impulse rate</div><div class="tier-row-stat"><strong>15.5%</strong>late night</div><div class="tier-row-stat"><strong>18.3%</strong>balance stress</div></div><div class="tier-row"><div><div class="tier-row-label" style="color:#ffdd57;">Moderate</div><div style="font-size:10px;color:var(--muted);">117 users</div></div><div class="tier-row-stat"><strong>29.4%</strong>impulse rate</div><div class="tier-row-stat"><strong>16.2%</strong>late night</div><div class="tier-row-stat"><strong>16.5%</strong>balance stress</div></div><div class="tier-row"><div><div class="tier-row-label" style="color:#ffdd57;">Moderate</div><div style="font-size:10px;color:var(--muted);">135 users</div></div><div class="tier-row-stat"><strong>19.6%</strong>impulse rate</div><div class="tier-row-stat"><strong>15.9%</strong>late night</div><div class="tier-row-stat"><strong>13.2%</strong>balance stress</div></div><div class="tier-row"><div><div class="tier-row-label" style="color:#ffdd57;">Moderate</div><div style="font-size:10px;color:var(--muted);">98 users</div></div><div class="tier-row-stat"><strong>9.2%</strong>impulse rate</div><div class="tier-row-stat"><strong>15.5%</strong>late night</div><div class="tier-row-stat"><strong>6.8%</strong>balance stress</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top SHAP Feature Importance (XGBoost)</div>
+      <div id="shapBars"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top At-Risk Users — Next Transaction Prediction</div>
+    <table class="model-table">
+      <thead><tr>
+        <th>User ID</th><th>P(Next Impulse)</th><th>Risk Score</th>
+        <th>Risk Tier</th><th>Alert Level</th><th>Historical Impulse Rate</th><th>Dominant Signal</th>
+      </tr></thead>
+      <tbody><tr><td style="font-size:10px;color:var(--muted);">e934e5a7-1d93-471f-b52...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:66%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.658</div></td><td>78.7</td><td><span class="tier-pill tier-Critical">Critical</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>47.8%</td><td style="font-size:10px;color:var(--accent5);">pred impulse rate</td></tr><tr><td style="font-size:10px;color:var(--muted);">9f32639a-82de-4ed0-9a8...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:64%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.636</div></td><td>72.6</td><td><span class="tier-pill tier-High">High</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>41.7%</td><td style="font-size:10px;color:var(--accent5);">mean spend zscore</td></tr><tr><td style="font-size:10px;color:var(--muted);">10627db7-61e9-4c9b-93c...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:57%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.575</div></td><td>64.3</td><td><span class="tier-pill tier-High">High</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>23.4%</td><td style="font-size:10px;color:var(--accent5);">mean category risk</td></tr><tr><td style="font-size:10px;color:var(--muted);">6b6b2786-cca0-4088-84a...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:57%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.571</div></td><td>69.8</td><td><span class="tier-pill tier-High">High</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>39.0%</td><td style="font-size:10px;color:var(--accent5);">mean spend zscore</td></tr><tr><td style="font-size:10px;color:var(--muted);">cc28ac16-215e-4617-926...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:57%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.569</div></td><td>89.1</td><td><span class="tier-pill tier-Critical">Critical</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>37.9%</td><td style="font-size:10px;color:var(--accent5);">recency weighted prob</td></tr><tr><td style="font-size:10px;color:var(--muted);">29147806-dde3-4cd0-9d1...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:57%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.567</div></td><td>67.2</td><td><span class="tier-pill tier-High">High</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>30.0%</td><td style="font-size:10px;color:var(--accent5);">weekend rate</td></tr><tr><td style="font-size:10px;color:var(--muted);">71f26e51-2b5e-4396-a36...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:56%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.560</div></td><td>70.9</td><td><span class="tier-pill tier-High">High</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>34.8%</td><td style="font-size:10px;color:var(--accent5);">recency weighted prob</td></tr><tr><td style="font-size:10px;color:var(--muted);">0b0e6d32-e8a3-4171-946...</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:50px;height:5px;background:var(--border);border-radius:3px;"><div style="width:55%;height:100%;background:var(--accent1);border-radius:3px;"></div></div>0.554</div></td><td>91.4</td><td><span class="tier-pill tier-Critical">Critical</span></td><td><span class="tier-pill tier-Warning">Warning</span></td><td>47.1%</td><td style="font-size:10px;color:var(--accent5);">mean salary ratio</td></tr></tbody>
+    </table>
+  </div>
+
+  <div>
+    <div class="section-label">Personalised Behavioural Nudges</div>
+    <div class="nudge-grid"><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Habitual Impulse Pattern Identified</div><div class="nudge-user">e934e5a7-1d93-471f-b...</div><div class="nudge-meta"><span class="tier-pill tier-Critical">Critical</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.66</span></div><div class="nudge-tip">Set a monthly impulse budget — a fixed amount you allow yourself to spend guilt-free on wants, and n...</div><div class="nudge-savings">Rs.112,662 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Unusual Spending Burst Detected</div><div class="nudge-user">9f32639a-82de-4ed0-9...</div><div class="nudge-meta"><span class="tier-pill tier-High">High</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.64</span></div><div class="nudge-tip">Ask yourself: is this a need, a want, or an impulse? Wants can wait 24 hours — impulses rarely can.</div><div class="nudge-savings">Rs.65,441 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">High-Impulse Category Alert</div><div class="nudge-user">10627db7-61e9-4c9b-9...</div><div class="nudge-meta"><span class="tier-pill tier-High">High</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.57</span></div><div class="nudge-tip">For high-risk categories, use a 48-hour wishlist rule before completing a purchase.</div><div class="nudge-savings">Rs.40,643 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Unusual Spending Burst Detected</div><div class="nudge-user">6b6b2786-cca0-4088-8...</div><div class="nudge-meta"><span class="tier-pill tier-High">High</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.57</span></div><div class="nudge-tip">Ask yourself: is this a need, a want, or an impulse? Wants can wait 24 hours — impulses rarely can.</div><div class="nudge-savings">Rs.67,824 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Escalating Risk Trend</div><div class="nudge-user">cc28ac16-215e-4617-9...</div><div class="nudge-meta"><span class="tier-pill tier-Critical">Critical</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.57</span></div><div class="nudge-tip">Review your last 5 purchases and identify which ones you would make again. This builds financial sel...</div><div class="nudge-savings">Rs.115,017 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Weekend Spending Pattern Detected</div><div class="nudge-user">29147806-dde3-4cd0-9...</div><div class="nudge-meta"><span class="tier-pill tier-High">High</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.57</span></div><div class="nudge-tip">Set a weekend leisure budget at the start of each week and track it separately from your essentials.</div><div class="nudge-savings">Rs.50,317 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">Escalating Risk Trend</div><div class="nudge-user">71f26e51-2b5e-4396-a...</div><div class="nudge-meta"><span class="tier-pill tier-High">High</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.56</span></div><div class="nudge-tip">Review your last 5 purchases and identify which ones you would make again. This builds financial sel...</div><div class="nudge-savings">Rs.60,890 potential savings</div></div><div class="nudge-card" style="--nc:#ff9f43;"><div class="nudge-alert">Warning</div><div class="nudge-title">High Salary-Relative Spend</div><div class="nudge-user">0b0e6d32-e8a3-4171-9...</div><div class="nudge-meta"><span class="tier-pill tier-Critical">Critical</span><span class="badge" style="background:rgba(162,155,254,0.1);color:var(--accent5);border:1px solid rgba(162,155,254,0.3);">P=0.55</span></div><div class="nudge-tip">Try the 50/30/20 rule: 50% needs, 30% wants, 20% savings. Your current pattern may be inverting this...</div><div class="nudge-savings">Rs.57,172 potential savings</div></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Full Model Evaluation Summary</div>
+    <table class="model-table">
+      <thead><tr>
+        <th>Model</th><th>Threshold</th><th>ROC-AUC</th><th>Avg Precision</th>
+        <th>F1 Score</th><th>Precision</th><th>Recall</th><th>MCC</th>
+      </tr></thead>
+      <tbody><tr><td style="font-weight:600;color:var(--text);">Logistic Regression</td><td>&mdash;</td><td style="color:var(--accent2);">0.9893</td><td>&mdash;</td><td style="color:var(--accent3);">0.8890</td><td>0.9063</td><td>0.8723</td><td style="color:var(--accent5);">0.8581</td></tr><tr><td style="font-weight:600;color:var(--text);">Random Forest</td><td>&mdash;</td><td style="color:var(--accent2);">0.9884</td><td>&mdash;</td><td style="color:var(--accent3);">0.8911</td><td>0.8988</td><td>0.8836</td><td style="color:var(--accent5);">0.8602</td></tr><tr><td style="font-weight:600;color:var(--accent3);">XGBoost <span class="badge badge-best">BEST</span></td><td>&mdash;</td><td style="color:var(--accent2);">0.9895</td><td>&mdash;</td><td style="color:var(--accent3);">0.8930</td><td>0.9127</td><td>0.8742</td><td style="color:var(--accent5);">0.8635</td></tr></tbody>
+    </table>
+  </div>
+
+</div>
+<footer>
+  <div>ImpulseIQ — Detecting Financial Impulse Behaviour in Young Adults</div>
+  <div>10-Step ML Pipeline | XGBoost + SHAP + Behavioural Economics</div>
+  <div style="color:var(--accent3);">BUILD COMPLETE</div>
+</footer>
+</div>
+
+<script>
+const tierCounts = {"Moderate": 135, "High": 117, "Low": 98, "Critical": 50};
+const modelData  = [{"Model": "Logistic Regression", "ROC-AUC": 0.9893, "F1": 0.889, "MCC": 0.8581, "Precision": 0.9063, "Recall": 0.8723}, {"Model": "Random Forest", "ROC-AUC": 0.9884, "F1": 0.8911, "MCC": 0.8602, "Precision": 0.8988, "Recall": 0.8836}, {"Model": "XGBoost", "ROC-AUC": 0.9895, "F1": 0.893, "MCC": 0.8635, "Precision": 0.9127, "Recall": 0.8742}];
+const shapData   = [{"feature": "category_impulse_risk", "mean_abs_shap": 1.5563068}, {"feature": "spend_zscore", "mean_abs_shap": 1.2924701}, {"feature": "merchant_category_Entertainment", "mean_abs_shap": 0.7414859}, {"feature": "merchant_category_Groceries", "mean_abs_shap": 0.65498126}, {"feature": "spend_to_salary_ratio", "mean_abs_shap": 0.6082791}, {"feature": "merchant_category_Luxury", "mean_abs_shap": 0.56052554}, {"feature": "user_impulse_rate", "mean_abs_shap": 0.47429323}, {"feature": "merchant_category_Food Delivery", "mean_abs_shap": 0.36400723}, {"feature": "spend_to_salary_ratio_rolling7_mean", "mean_abs_shap": 0.18638662}, {"feature": "merchant_category_Utilities", "mean_abs_shap": 0.1526217}, {"feature": "transaction_amount_rolling3_mean", "mean_abs_shap": 0.14649303}, {"feature": "balance_to_salary_ratio", "mean_abs_shap": 0.1256935}];
+const scoresBins = [4.85, 6.275, 7.5875, 7.9875, 7.99375, 8.262500000000001, 8.4, 8.5875, 9.71875, 11.2375, 11.45, 12.6375, 13.4625, 15.1125, 15.306250000000002, 15.425, 15.775, 16.224999999999998, 16.40625, 17.25, 17.35, 18.275, 18.725, 18.875, 19.4, 20.012500000000003, 20.075, 20.475, 20.6125, 20.825, 20.9625, 22.3875, 22.55, 22.637500000000003, 22.8625, 23.143750000000004, 23.175000000000004, 23.2, 23.2375, 23.33125, 23.375000000000004, 23.375000000000004, 23.69375, 23.968750000000004, 24.19375, 24.3125, 24.61875, 24.731250000000003, 25.275, 25.775, 25.94375, 26.2125, 26.25625, 26.85, 26.8875, 27.06875, 27.125, 27.137500000000003, 27.225, 27.25625, 27.300000000000004, 27.3125, 27.812500000000004, 27.98125, 28.187500000000007, 28.40000000000001, 28.83125, 28.95625, 29.1, 29.15, 29.225000000000005, 29.556249999999995, 29.99375, 30.1375, 30.5, 30.5, 30.825000000000003, 31.05, 31.0875, 31.24375000000001, 31.343750000000004, 31.456250000000004, 32.03125, 32.0625, 32.3875, 32.7125, 32.79375, 33.0125, 33.03125, 33.0875, 33.2, 33.225, 33.3, 33.60625, 34.3875, 34.6375, 34.7625, 34.8625, 35.1, 35.5125, 35.6625, 35.68125, 35.9, 35.90625, 35.975, 36.075, 36.425, 36.5125, 36.55, 36.68125, 36.74375, 37.05, 37.05, 37.06875, 37.15625, 37.5, 37.712500000000006, 37.775, 37.89375, 37.925, 38.0375, 38.075, 38.18749999999999, 38.462500000000006, 38.5625, 38.87500000000001, 39.20625, 39.51875, 39.6375, 39.65625, 39.675, 39.7875, 39.83125, 39.837500000000006, 39.9875, 40.125, 40.4625, 40.55, 40.55, 40.65, 40.83125, 40.837500000000006, 41.2875, 41.425, 41.51875, 41.587500000000006, 41.65625, 41.825, 41.85, 41.93750000000001, 41.96875000000001, 42.43125, 42.57499999999999, 42.7, 42.83125, 42.900000000000006, 42.95625, 43.425, 43.425, 43.96249999999999, 44.01875, 44.38125, 44.71875, 44.75, 44.9125, 44.94375000000001, 45.0125, 45.225, 45.22500000000001, 45.2875, 45.29375, 45.51875, 45.525, 45.5375, 45.54375, 45.6125, 45.77499999999999, 45.7875, 45.85625, 46.05, 46.1375, 46.61875, 46.6625, 46.70625, 46.94375, 47.181250000000006, 47.2125, 47.27499999999999, 47.8625, 48.06250000000001, 48.09374999999999, 48.1875, 48.25, 48.28125, 48.375, 48.3875, 48.45625, 48.5125, 48.54375, 48.63125, 48.69375, 48.95, 48.96874999999999, 49.16875, 49.1875, 49.3125, 49.40625, 49.58125, 49.6375, 49.7, 50.24375, 50.3625, 50.75625, 50.87500000000001, 51.181250000000006, 51.35, 51.5125, 51.6125, 51.66875, 51.95, 52.5, 52.5125, 52.5125, 52.5375, 52.64999999999999, 52.95, 53.275, 53.5375, 53.975, 54.0125, 54.025, 54.21875, 54.7, 55.025, 55.1125, 55.19375, 55.21875, 55.7625, 55.825, 55.8875, 55.90625000000001, 56.125, 56.475, 56.53125, 56.9, 56.9, 57.0875, 57.11875, 57.2125, 57.36249999999999, 57.45, 57.7, 57.8, 58.03749999999999, 58.08749999999999, 58.150000000000006, 58.1875, 58.325, 58.34374999999999, 58.55, 58.6125, 59.0375, 59.55, 59.875, 59.8875, 59.89375, 59.975, 60.26250000000001, 60.39375, 60.49375, 60.75000000000001, 60.76875, 60.9, 61.25000000000001, 61.6125, 61.625, 61.925, 62.07499999999999, 62.25, 62.34375, 62.375, 62.52499999999999, 62.78125, 63.0, 63.4625, 63.49999999999999, 63.7, 63.71249999999999, 63.85, 64.175, 64.1875, 64.31249999999999, 64.95, 64.975, 65.325, 65.7375, 65.95625000000001, 66.26249999999999, 66.4875, 66.6125, 66.8125, 66.825, 67.05, 67.08749999999999, 67.17499999999998, 67.28750000000001, 67.4125, 67.8375, 68.0875, 68.125, 68.15625, 68.79375, 68.9875, 69.7875, 70.0375, 70.1, 70.425, 70.57499999999999, 70.63125000000001, 70.6625, 70.69999999999999, 70.875, 71.1, 71.24375, 71.7375, 71.73750000000001, 71.79375, 71.88125, 72.33749999999999, 72.3625, 72.4875, 72.6, 72.6, 73.09375000000001, 73.1, 73.20625, 73.225, 73.25625, 73.6, 73.625, 73.6625, 73.7625, 74.00625, 74.075, 74.225, 74.77499999999999, 74.8125, 74.825, 74.925, 74.98750000000001, 75.33749999999999, 75.6125, 75.925, 75.9875, 76.56875000000001, 76.95, 77.05, 77.475, 77.64999999999999, 77.96249999999999, 78.25625, 78.675, 78.75, 78.80625000000002, 78.9125, 78.93125, 79.2375, 79.31875000000001, 79.9875, 79.9875, 79.98750000000001, 80.1125, 80.875, 80.88125, 80.975, 81.14375000000001, 81.4125, 81.54375, 81.875, 82.21249999999999, 82.325, 82.54374999999999, 83.42500000000001, 83.8625, 84.5375, 84.92500000000001, 85.0875, 85.21875, 85.925, 85.925, 86.8, 87.16875000000002, 87.3125, 88.28750000000001, 88.74999999999999, 89.1, 89.6625, 91.4, 92.2, 94.2875];
+
+const COLORS = {Critical:'#f72585',High:'#ff9f43',Moderate:'#ffdd57',Low:'#4cc9f0'};
+Chart.defaults.color = '#7070a0';
+Chart.defaults.borderColor = '#1e1e40';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+
+const tierOrder = ['Critical','High','Moderate','Low'];
+new Chart(document.getElementById('donutChart').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: tierOrder.filter(t => tierCounts[t]),
+    datasets: [{
+      data: tierOrder.filter(t => tierCounts[t]).map(t => tierCounts[t]),
+      backgroundColor: tierOrder.filter(t => tierCounts[t]).map(t => COLORS[t] + '99'),
+      borderColor:     tierOrder.filter(t => tierCounts[t]).map(t => COLORS[t]),
+      borderWidth: 2, hoverOffset: 8,
+    }]
+  },
+  options: {
+    cutout: '65%',
+    plugins: {
+      legend: {position:'bottom', labels:{boxWidth:12,padding:14,font:{size:11}}},
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' users' } }
+    }
+  }
+});
+
+const metrics = ['ROC-AUC','F1','MCC','Precision','Recall'];
+new Chart(document.getElementById('modelChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: metrics,
+    datasets: modelData.map((m, i) => ({
+      label: m.Model,
+      data: metrics.map(k => m[k]),
+      backgroundColor: ['rgba(255,221,87,0.7)','rgba(76,201,240,0.7)','rgba(247,37,133,0.7)'][i],
+      borderColor:     ['#ffdd57','#4cc9f0','#f72585'][i],
+      borderWidth: 1.5, borderRadius: 4,
+    }))
+  },
+  options: {
+    plugins: {legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}},
+    scales: {
+      y: {min:0.8, max:1.0, grid:{color:'#1e1e40'}, ticks:{font:{size:10}}},
+      x: {grid:{display:false}, ticks:{font:{size:10}}}
+    }
+  }
+});
+
+function histBins(data, nBins) {
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const step = (mx - mn) / nBins;
+  const bins = Array(nBins).fill(0);
+  const labels = [];
+  for (let i = 0; i < nBins; i++) labels.push((mn + i*step).toFixed(0));
+  data.forEach(v => { let idx = Math.floor((v-mn)/step); if(idx>=nBins) idx=nBins-1; bins[idx]++; });
+  return {labels, bins};
+}
+const {labels:sLabels, bins:sBins} = histBins(scoresBins, 30);
+new Chart(document.getElementById('scoreDistChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: sLabels,
+    datasets: [{
+      label: 'Users', data: sBins,
+      backgroundColor: ctx => {
+        const v = parseFloat(sLabels[ctx.dataIndex]);
+        if(v>=75) return 'rgba(247,37,133,0.75)';
+        if(v>=55) return 'rgba(255,159,67,0.75)';
+        if(v>=35) return 'rgba(255,221,87,0.75)';
+        return 'rgba(76,201,240,0.75)';
+      },
+      borderWidth: 0, borderRadius: 2,
+    }]
+  },
+  options: {
+    plugins: {legend:{display:false}},
+    scales: {
+      y: {grid:{color:'#1e1e40'}, ticks:{font:{size:10}}},
+      x: {grid:{display:false}, ticks:{maxTicksLimit:8, font:{size:9}}}
+    }
+  }
+});
+
+const maxShap = Math.max(...shapData.map(d => d.mean_abs_shap));
+const shapContainer = document.getElementById('shapBars');
+shapData.forEach(d => {
+  const pct = (d.mean_abs_shap / maxShap * 100).toFixed(1);
+  const row = document.createElement('div');
+  row.className = 'shap-row';
+  row.innerHTML =
+    '<div class="shap-label" title="' + d.feature + '">' + d.feature + '</div>' +
+    '<div class="shap-bar-bg"><div class="shap-bar-fill" style="width:' + pct + '%"></div></div>' +
+    '<div class="shap-val">' + d.mean_abs_shap.toFixed(4) + '</div>';
+  shapContainer.appendChild(row);
+});
+</script>
+</body>
+</html>
