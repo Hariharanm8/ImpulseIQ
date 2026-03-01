@@ -217,7 +217,7 @@ Potential benefits:
 
 ---
 
-## 🏁 Conclusion
+## Conclusion
 
 ImpulseIQ demonstrates how behavioural modelling and machine learning can be combined to:
 
