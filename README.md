@@ -168,11 +168,12 @@ pip install flask pandas numpy scikit-learn xgboost joblib
 
 python app.py
 
+or 
 
-4. Open browser:
+Open browser:
 
 
-http://127.0.0.1:5000
+https://claude.ai/public/artifacts/7f9df2e0-e593-4d78-b9da-5d64efdc3242
 
 
 ---
