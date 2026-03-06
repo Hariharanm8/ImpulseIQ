@@ -161,7 +161,7 @@ Impulse Probability → Risk Score → Risk Tier → Behavioural Output
 pip install flask pandas numpy scikit-learn xgboost joblib
 
 
-2. Ensure `model.pkl` (trained XGBoost model) is in the project folder.
+2. Ensure `model_xgb.pkl` (trained XGBoost model) is in the project folder.
 
 3. Run:
 
